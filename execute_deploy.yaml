@@ -1,0 +1,50 @@
+trigger:
+  branches:
+    exclude:
+      - '*'
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - sqlscript/*
+
+jobs:
+- job: IdentifyChanges
+  displayName: Identify Changes in Main Commit
+  pool:
+    vmImage: 'windows-latest'
+  variables:
+  - group: "var-group-name-here"
+    
+  steps:
+  - task: AzurePowerShell@5
+    inputs:
+      azureSubscription: 'service-connection-here'
+      scriptType: filePath
+      scriptPath: $(Build.SourcesDirectory)\script\take_queries.ps1
+      azurePowerShellVersion: latestVersion
+      scriptArguments: -pat $(System.AccessToken) -buildsourceversion $(Build.SourceVersion)
+    env:
+      clientid: $(client-app-prd)
+      tenantid: $(tenant-app-prd)
+      secret: $(sct-app-prd)
+
+  - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@2
+    displayName: 'Synapse deployment task for workspace: dev'
+    inputs:
+      operation: validateDeploy
+      ArtifactsFolder: '$(System.DefaultWorkingDirectory)'
+      azureSubscription: 'service-connection-dev-here'
+      ResourceGroupName: 'rg-dev-name-here'
+      TargetWorkspaceName: syn-dev-name
+
+  - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@2
+    displayName: 'Synapse deployment task for workspace: prd'
+    inputs:
+      operation: validateDeploy
+      ArtifactsFolder: '$(System.DefaultWorkingDirectory)'
+      azureSubscription: 'service-connection-prd-here'
+      ResourceGroupName: 'rg-prd-name-here'
+      TargetWorkspaceName: syn-prd-name
